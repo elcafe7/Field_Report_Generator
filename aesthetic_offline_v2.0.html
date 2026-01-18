@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tactical Report Generator</title>
+    <style>
+        :root {
+            --glass-bg: rgba(28, 28, 30, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.05);
+            --accent: #0a84ff;
+            --accent-glow: rgba(10, 132, 255, 0.5);
+            --text-primary: #ffffff;
+            --text-secondary: #86868b;
+            --input-bg: rgba(0, 0, 0, 0.3);
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+            background-color: #000;
+            background-image: 
+                radial-gradient(circle at 0% 0%, #2a1f63 0%, transparent 50%), 
+                radial-gradient(circle at 100% 0%, #1a4d6e 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, #3e1b45 0%, transparent 50%),
+                radial-gradient(circle at 0% 100%, #000000 0%, transparent 50%);
+            background-attachment: fixed;
+            background-size: cover;
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --- THE GLASS CONTAINER --- */
+        .app-shell {
+            width: 100%;
+            max-width: 720px;
+            min-height: 600px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: height 0.3s ease;
+        }
+
+        /* HEADER */
+        header { text-align: center; margin-bottom: 30px; position: relative; z-index: 2; }
+        h1 { 
+            font-size: 28px; 
+            font-weight: 600; 
+            letter-spacing: -0.01em; 
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, #ddd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: var(--text-secondary); font-size: 15px; font-weight: 400; }
+
+        /* SELECTION GRID */
+        #selection-screen { animation: fadeScaleIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); 
+            gap: 16px; 
+        }
+        
+        .card {
+            background: var(--glass-highlight);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 140px;
+        }
+        
+        .card:hover { 
+            background: rgba(255, 255, 255, 0.1); 
+            transform: scale(1.03) translateY(-2px); 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            border-color: rgba(255,255,255,0.2);
+        }
+        
+        .card h3 { 
+            font-size: 17px; 
+            font-weight: 600; 
+            color: #fff; 
+            margin-bottom: 8px; 
+        }
+        
+        .card p { 
+            font-size: 13px; 
+            color: var(--text-secondary); 
+            line-height: 1.4; 
+        }
+
+        /* WIZARD & INPUTS */
+        #wizard-container { display: none; height: 100%; flex: 1; }
+        
+        .step { display: none; animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .step.active { display: block; }
+        
+        label { 
+            display: block; 
+            font-size: 22px; 
+            font-weight: 600; 
+            margin-bottom: 8px; 
+            color: #fff; 
+            letter-spacing: -0.01em;
+        }
+        
+        .helper-text { 
+            font-size: 15px; 
+            color: var(--text-secondary); 
+            margin-bottom: 24px; 
+            line-height: 1.5; 
+        }
+        
+        textarea {
+            width: 100%; 
+            min-height: 200px; 
+            padding: 20px;
+            background: var(--input-bg);
+            border: 1px solid transparent;
+            border-radius: var(--radius-md);
+            color: #fff;
+            font-size: 17px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        textarea:focus { 
+            background: rgba(0,0,0,0.4);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.15); 
+        }
+
+        /* NAVIGATION & BUTTONS */
+        .navigation { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-top: 30px; 
+            gap: 16px; 
+        }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 14px 24px;
+            font-size: 15px;
+            font-weight: 500;
+            border-radius: 50px; 
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+            backdrop-filter: blur(10px);
+        }
+        
+        button:hover { 
+            background: rgba(255,255,255,0.2); 
+            transform: translateY(-1px);
+        }
+        
+        button.primary, button[onclick*="nextStep"], button[onclick*="generateFinal"] {
+            background: var(--accent);
+            border: none;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+        
+        button.primary:hover, button[onclick*="nextStep"]:hover {
+            background: #2090ff;
+            box-shadow: 0 6px 16px var(--accent-glow);
+        }
+
+        /* PROGRESS BAR */
+        .progress-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: transparent;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #5ac8fa);
+            width: 0%;
+            transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* PREVIEW SCREEN */
+        #preview {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        h2 { 
+            font-size: 20px; 
+            color: #fff; 
+            margin-bottom: 20px; 
+            padding-bottom: 10px; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+        }
+
+        .preview-item { 
+            margin-bottom: 20px; 
+            background: rgba(255,255,255,0.03); 
+            padding: 16px; 
+            border-radius: var(--radius-sm); 
+        }
+        
+        .preview-item strong { 
+            display: block; 
+            font-size: 11px; 
+            text-transform: uppercase; 
+            color: var(--text-secondary); 
+            margin-bottom: 6px; 
+            letter-spacing: 1px; 
+        }
+        
+        .preview-item p { 
+            color: #fff; 
+            line-height: 1.6; 
+            white-space: pre-wrap; 
+            font-size: 15px;
+        }
+
+        #copyFeedback {
+            text-align: center;
+            margin-top: 15px;
+            color: #30d158;
+            font-weight: 500;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #copyFeedback.visible { opacity: 1; }
+
+        /* ANIMATIONS */
+        @keyframes fadeScaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* PRINT OVERRIDES */
+        @media print {
+            body { background: white !important; color: black !important; padding: 0; display: block; }
+            .app-shell { 
+                box-shadow: none; border: none; backdrop-filter: none; background: white; 
+                max-width: 100%; padding: 0; margin: 0; min-height: auto;
+            }
+            #selection-screen, #wizard-container button, .navigation, header, .progress-container { display: none !important; }
+            #wizard-container, #preview { display: block !important; }
+            .preview-item { border: none; background: none; padding: 0; margin-bottom: 20px; border-bottom: 1px solid #ccc; }
+            .preview-item p { color: black; font-size: 12pt; }
+            .preview-item strong { color: #555; }
+            h2 { color: black; border-bottom: 2px solid black; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <div class="progress-container">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <!-- HEADER -->
+    <header id="main-header">
+        <h1 id="app-title">Tactical Report</h1>
+        <div class="subtitle" id="app-subtitle">Select a template to begin</div>
+    </header>
+
+    <!-- SELECTION SCREEN -->
+    <div id="selection-screen">
+        <div class="grid">
+            <div class="card" onclick="startReport('BASIC')">
+                <h3>Narrative Report</h3>
+                <p>Suspicious Activity. Description, Details, Media.</p>
+            </div>
+            <div class="card" onclick="startReport('SALT')">
+                <h3>SALT</h3>
+                <p>Brief Observation. Size, Activity, Location, Time.</p>
+            </div>
+            <div class="card" onclick="startReport('SALUTE')">
+                <h3>SALUTE</h3>
+                <p>Standard Enemy Report. Size, Activity, Unit, Equip.</p>
+            </div>
+            <div class="card" onclick="startReport('SITREP')">
+                <h3>SITREP</h3>
+                <p>Situation Status. Enemy, Friendly, Logistics.</p>
+            </div>
+            <div class="card" onclick="startReport('INTREP')">
+                <h3>INTREP</h3>
+                <p>Intel Event. Details, Source, Assessment.</p>
+            </div>
+            <div class="card" onclick="startReport('TACTREP')">
+                <h3>TACTREP</h3>
+                <p>Tactical Event. Area, Event, Actions Taken.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- WIZARD CONTAINER -->
+    <div id="wizard-container">
+        <!-- Dynamic Steps injected here -->
+        <div id="dynamic-steps"></div>
+
+        <!-- PREVIEW SCREEN -->
+        <div id="preview">
+            <h2 id="final-title">Final Report</h2>
+            <div id="preview-list"></div>
+
+            <div class="navigation">
+                <button onclick="editReport()">Edit</button>
+                <button onclick="downloadHtml()">Save HTML</button>
+                <button class="primary" onclick="copyToClipboard()">Copy</button>
+                <button onclick="window.print()">Print</button>
+            </div>
+            
+            <div id="copyFeedback">✓ Copied to clipboard</div>
+            
+            <br>
+            <center>
+                <button style="background:transparent; border:none; color:var(--text-secondary); font-size:13px;" onclick="location.reload()">Start New Report</button>
+            </center>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* --- CONFIGURATION --- */
+    const reportConfig = {
+        SALT: {
+            title: "SALT Report",
+            fields: [
+                { id: "size", label: "Size", help: "Number of personnel, vehicles, or elements.", placeholder: "E.g., 3 adult males, 2 SUVs..." },
+                { id: "activity", label: "Activity", help: "What are they doing? Direction of travel?", placeholder: "E.g., Moving North rapidly..." },
+                { id: "location", label: "Location", help: "Grid coordinates or landmark.", placeholder: "E.g., Grid 1234 5678 or Main St intersection..." },
+                { id: "time", label: "Time", help: "Date and Time of observation.", placeholder: "Current time..." }
+            ]
+        },
+        SALUTE: {
+            title: "SALUTE Report",
+            fields: [
+                { id: "size", label: "Size", help: "Number of personnel or vehicles.", placeholder: "How many?" },
+                { id: "activity", label: "Activity", help: "Actions, direction, movement.", placeholder: "What are they doing?" },
+                { id: "location", label: "Location", help: "Grid, lat/long, or description.", placeholder: "Where are they?" },
+                { id: "unit", label: "Unit", help: "Patches, markings, uniform type.", placeholder: "Who are they?" },
+                { id: "time", label: "Time", help: "DTG of observation.", placeholder: "When did you see this?" },
+                { id: "equipment", label: "Equipment", help: "Weapons, sensors, vehicles.", placeholder: "What gear do they have?" }
+            ]
+        },
+        BASIC: {
+            title: "Narrative Report",
+            fields: [
+                { id: "datetime", label: "Date / Time", help: "Start time and duration of the event.", placeholder: "E.g., Today at 14:00..." },
+                { id: "location", label: "Location", help: "Exact address or landmark.", placeholder: "E.g., Corner of Main & 1st..." },
+                { id: "description", label: "Description", help: "Person (race, sex, age, clothing), Vehicle, Activity.", placeholder: "Describe visuals..." },
+                { id: "suspicion", label: "Suspicion", help: "Why did it seem suspicious?", placeholder: "Matched pattern..." },
+                { id: "reporter", label: "Your Info", help: "Name (Optional).", placeholder: "Name / Phone..." },
+                { id: "media", label: "Media", help: "Did you take photos or video?", placeholder: "Video taken..." }
+            ]
+        },
+        SITREP: {
+            title: "SITREP",
+            fields: [
+                { id: "time", label: "Time", help: "Period covered.", placeholder: "As of..." },
+                { id: "enemy", label: "Enemy", help: "Enemy activity observed.", placeholder: "Activity..." },
+                { id: "friendly", label: "Friendly", help: "Location and status.", placeholder: "Unit location..." },
+                { id: "logistics", label: "Logistics", help: "Supply status.", placeholder: "Green/Amber/Red..." },
+                { id: "command", label: "Command", help: "Command & Signal.", placeholder: "No changes..." }
+            ]
+        },
+        INTREP: {
+            title: "INTREP",
+            fields: [
+                { id: "time", label: "Time", help: "When did event occur?", placeholder: "DTG..." },
+                { id: "location", label: "Location", help: "Where did event occur?", placeholder: "Grid..." },
+                { id: "event", label: "Event", help: "Who, What, How?", placeholder: "Describe..." },
+                { id: "source", label: "Source", help: "Observed, HUMINT, etc.", placeholder: "Visual..." },
+                { id: "assessment", label: "Assessment", help: "Interpretation.", placeholder: "Significance..." }
+            ]
+        },
+        TACTREP: {
+            title: "TACTREP",
+            fields: [
+                { id: "time", label: "Time", help: "Date Time Group.", placeholder: "DTG..." },
+                { id: "area", label: "Area", help: "Area of Interest.", placeholder: "Sector A..." },
+                { id: "subject", label: "Subject", help: "Event reported.", placeholder: "Contact..." },
+                { id: "action", label: "Action", help: "Friendly actions.", placeholder: "Returned fire..." }
+            ]
+        }
+    };
+
+    /* --- LOGIC --- */
+    let currentReportKey = '';
+    let currentFields = [];
+
+    function startReport(key) {
+        currentReportKey = key;
+        const config = reportConfig[key];
+        currentFields = config.fields;
+        
+        document.getElementById('app-subtitle').innerText = config.title;
+        document.getElementById('selection-screen').style.display = 'none';
+        document.getElementById('wizard-container').style.display = 'block';
+
+        buildSteps();
+        
+        // Auto-fill time
+        const now = new Date().toLocaleString();
+        setTimeout(() => {
+            const timeEl = document.getElementById('time') || document.getElementById('datetime');
+            if(timeEl) timeEl.value = now;
+        }, 100);
+
+        showStep(1);
+    }
+
+    function buildSteps() {
+        const container = document.getElementById('dynamic-steps');
+        container.innerHTML = '';
+        const total = currentFields.length;
+
+        currentFields.forEach((field, index) => {
+            const stepNum = index + 1;
+            const div = document.createElement('div');
+            div.id = `step${stepNum}`;
+            div.className = 'step';
+            
+            let btnHtml = '';
+            if (stepNum === 1) {
+                btnHtml = `<button onclick="location.reload()">Cancel</button>
+                           <button class="primary" onclick="nextStep(${stepNum + 1})">Next</button>`;
+            } else if (stepNum === total) {
+                btnHtml = `<button onclick="prevStep(${stepNum - 1})">Back</button>
+                           <button class="primary" onclick="generateFinal()">Generate</button>`;
+            } else {
+                btnHtml = `<button onclick="prevStep(${stepNum - 1})">Back</button>
+                           <button class="primary" onclick="nextStep(${stepNum + 1})">Next</button>`;
+            }
+
+            div.innerHTML = `
+                <label>${field.label}</label>
+                <div class="helper-text">${field.help}</div>
+                <textarea id="${field.id}" placeholder="${field.placeholder}" autofocus></textarea>
+                <div class="navigation">${btnHtml}</div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function showStep(step) {
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        const el = document.getElementById(`step${step}`);
+        if(el) {
+            el.classList.add('active');
+            const ta = el.querySelector('textarea');
+            if(ta) setTimeout(() => ta.focus(), 100);
+            updateProgress(step);
+        }
+    }
+
+    function nextStep(t) { showStep(t); }
+    function prevStep(t) { showStep(t); }
+
+    function updateProgress(step) {
+        const pct = ((step - 1) / currentFields.length) * 100;
+        document.getElementById('progressFill').style.width = `${pct}%`;
+    }
+
+    function generateFinal() {
+        // Hide all steps
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        
+        // Show Preview
+        document.getElementById('preview').style.display = 'block';
+        document.getElementById('progressFill').style.width = '100%';
+        document.getElementById('app-subtitle').innerText = "Export Report";
+
+        const pList = document.getElementById('preview-list');
+        pList.innerHTML = '';
+        
+        currentFields.forEach(f => {
+            let val = document.getElementById(f.id).value.trim();
+            if(!val) val = "—";
+            pList.innerHTML += `
+                <div class="preview-item">
+                    <strong>${f.label}</strong>
+                    <p>${val}</p>
+                </div>
+            `;
+        });
+        window.scrollTo(0,0);
+    }
+
+    function editReport() {
+        document.getElementById('preview').style.display = 'none';
+        document.getElementById('app-subtitle').innerText = reportConfig[currentReportKey].title;
+        // Go back to the last step
+        showStep(currentFields.length);
+    }
+
+    async function copyToClipboard() {
+        const data = currentFields.map(f => {
+            let val = document.getElementById(f.id).value.trim();
+            return val ? `${f.label}: ${val}` : `${f.label}: N/A`;
+        }).join('\n\n');
+        
+        const text = `*** ${reportConfig[currentReportKey].title.toUpperCase()} ***\n\n${data}\n\nGenerated: ${new Date().toLocaleString()}`;
+        
+        try {
+            await navigator.clipboard.writeText(text);
+            const fb = document.getElementById('copyFeedback');
+            fb.classList.add('visible');
+            setTimeout(() => fb.classList.remove('visible'), 2000);
+        } catch(e) { alert("Copy failed."); }
+    }
+
+    function downloadHtml() {
+        const escape = (str) => str.replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;' })[m]);
+        
+        let rows = '';
+        currentFields.forEach(f => {
+            let val = document.getElementById(f.id).value.trim() || "—";
+            rows += `<div style="margin-bottom:20px"><div style="font-size:10px;font-weight:bold;color:#666;text-transform:uppercase">${f.label}</div><div style="background:#f5f5f7;padding:10px;border-radius:8px;margin-top:4px;white-space:pre-wrap;font-family:sans-serif">${escape(val)}</div></div>`;
+        });
+
+        const html = `<!DOCTYPE html><html><head><title>Report</title></head><body style="font-family:-apple-system,sans-serif;padding:40px;max-width:800px;margin:0 auto;color:#333">
+            <h1 style="border-bottom:2px solid #333;padding-bottom:10px">${reportConfig[currentReportKey].title}</h1>
+            <div style="color:#666;font-size:12px;margin-bottom:30px">Generated: ${new Date().toLocaleString()}</div>
+            ${rows}
+        </body></html>`;
+
+        const blob = new Blob([html], {type:'text/html'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Report_${new Date().getTime()}.html`;
+        a.click();
+    }
+</script>
+
+</body>
+</html>
